@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "mod_info": {
+    "name": "HalfLife2HeadTracking",
+    "version": "0.0.0",
+    "game_id": "half-life-2"
+  },
+  "strategy": "AsiLoader",
+  "delivery_mode": "manifest",
+
+  "files": [
+    {
+      "source": "vendor/ultimate-asi-loader/dinput8.dll",
+      "target": "bin/winmm.dll",
+      "backup": true
+    },
+    {
+      "source": "plugins/HalfLife2HeadTracking.asi",
+      "target": "bin/HalfLife2HeadTracking.asi"
+    }
+  ],
+
+  "runtime_requirements": [],
+  "dependencies": []
+}

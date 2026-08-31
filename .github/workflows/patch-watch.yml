@@ -1,0 +1,118 @@
+name: Patch watch
+
+# Half-Life 2's client.dll RVAs are pinned per build, so a game patch makes the
+# mod go dormant until a new build profile is added. This asks Steam once a
+# day for the app's public-branch buildid and opens a rederive issue the first
+# time it changes, so a release can be prepared before users hit the dormant
+# log line. It is a heads-up channel, never the safety mechanism - the
+# in-process PE fingerprint check is what keeps a patched game playable.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: patch-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to the commit SHA - tags are mutable. Node-24 runtime.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          submodules: recursive
+
+      - name: Query Steam for the public-branch buildid
+        id: steam
+        run: |
+          set -euo pipefail
+          # Half-Life 2's Steam app id. Spelled out here rather than parsed out
+          # of cameraunlock-core/data/games.json so this job does not depend on
+          # the submodule checkout; it matches that catalog's half-life-2 entry.
+          APPID=220
+          echo "appid=$APPID" >> "$GITHUB_OUTPUT"
+
+          docker run --rm steamcmd/steamcmd:ubuntu-22 \
+            +login anonymous +app_info_update 1 +app_info_print "$APPID" +quit > steamcmd.txt
+
+          # The buildid we want is the one under branches -> public. Anything
+          # else (beta branches, depot ids) is a different number entirely, so
+          # parse the block rather than grepping the first match.
+          BUILDID=$(python3 <<'PY'
+          import re, sys
+          text = open('steamcmd.txt', encoding='utf-8', errors='replace').read()
+          m = re.search(r'"branches"\s*\{(.*)', text, re.S)
+          if not m:
+              sys.exit("no branches block in steamcmd output")
+          m2 = re.search(r'"public"\s*\{(.*?)\}', m.group(1), re.S)
+          if not m2:
+              sys.exit("no public branch in steamcmd output")
+          m3 = re.search(r'"buildid"\s*"(\d+)"', m2.group(1))
+          if not m3:
+              sys.exit("no buildid in public branch")
+          print(m3.group(1))
+          PY
+          )
+          echo "buildid=$BUILDID" >> "$GITHUB_OUTPUT"
+          echo "public-branch buildid: $BUILDID"
+
+      - name: Compare against the last known buildid
+        id: compare
+        run: |
+          set -euo pipefail
+          LAST=$(cat .github/last-known-build.txt 2>/dev/null || echo "")
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+          if [ "$LAST" = "${{ steps.steam.outputs.buildid }}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a rederive issue
+        if: steps.compare.outputs.changed == 'true' && steps.compare.outputs.last != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Half-Life 2 build ${{ steps.steam.outputs.buildid }} published - check client.dll fingerprint" \
+            --body "$(cat <<'EOF'
+          Steam's public branch moved to a new buildid, so the pinned
+          `CViewRender::RenderView` RVA may no longer be valid.
+
+          A buildid change is **not** proof the DLL changed - asset-only patches
+          move it and leave `client.dll` untouched. Closing this with no code
+          change is a normal outcome.
+
+          - [ ] Update the game, then run `pixi run check-fingerprint`.
+          - [ ] If the fingerprint matches an existing profile: close, nothing to do.
+          - [ ] Otherwise add a NEW `kSteamProfile_YYYYMMDD` to
+                `src/builds/steam_offsets.cpp`, declare it in
+                `src/builds/build_registry.h`, and put it at the TOP of
+                `kKnownProfiles` in `src/builds/build_registry.cpp`. Never edit an
+                existing profile's RVAs - users on the old build must keep working.
+          - [ ] Rederive the RenderView RVA against the new `client.dll` (locate the
+                `CViewRender` RTTI vftable, then slot 6).
+          - [ ] Verify in game that the view still tracks and the crosshair still
+                marks the shot.
+          - [ ] CHANGELOG entry as an addition: "adds support for Steam build
+                <buildid>; earlier builds keep working".
+          EOF
+          )"
+
+      - name: Record the new buildid
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          echo "${{ steps.steam.outputs.buildid }}" > .github/last-known-build.txt
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/last-known-build.txt
+          git commit -m "chore: record Half-Life 2 build ${{ steps.steam.outputs.buildid }} [skip ci]"
+          git push

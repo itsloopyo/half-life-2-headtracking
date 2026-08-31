@@ -1,0 +1,56 @@
+[workspace]
+name = "half-life-2-head-tracking"
+version = "0.0.0"
+description = "Head tracking mod for Half-Life 2 (Source Engine) using the CameraUnlock shared library"
+license = "MIT"
+license-file = "LICENSE"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tasks]
+# Pull cameraunlock-core to the tip of its tracked branch. Manual: the new
+# pointer is a deliberate commit, no build task depends on this.
+sync = { cmd = "git submodule update --remote cameraunlock-core" }
+
+# Half-Life 2 is 32-bit Source Engine - build x86.
+# No -G: let CMake auto-detect the installed Visual Studio generator. Pinning
+# "Visual Studio 17 2022" broke on CI once the windows runner image moved to
+# VS 2026 (VS 17 absent); auto-detect picks whatever VS the machine has.
+setup = { cmd = """
+    powershell -Command "if (-not (Test-Path 'build')) { cmake -B build -A Win32 } else { Write-Host 'Build directory exists, skipping setup' -ForegroundColor Yellow }"
+""" }
+
+build = { cmd = "cmake --build build --config Debug", depends-on = ["setup"] }
+build-release = { cmd = "cmake --build build --config Release", depends-on = ["setup"] }
+
+# Characterization tests for the mod's pure logic (tests/). No game needed.
+test = { cmd = "ctest --test-dir build -C Debug --output-on-failure", depends-on = ["build"] }
+
+clean = { cmd = """
+    powershell -Command "if (Test-Path 'build') { Remove-Item 'build' -Recurse -Force }; Write-Host 'Build artifacts cleaned' -ForegroundColor Green"
+""" }
+
+clean-all = { cmd = """
+    powershell -Command "if (Test-Path 'build') { Remove-Item 'build' -Recurse -Force }; if (Test-Path 'release') { Remove-Item 'release' -Recurse -Force }; Write-Host 'All build artifacts cleaned' -ForegroundColor Green"
+""" }
+
+# Bump vendored ASI Loader. Manual; commit the diff. CI does not run this.
+update-deps = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/update-deps.ps1" }
+
+# Print the installed client.dll's PE fingerprint as a build-profile stub.
+# First step whenever a patch lands or a user reports the dormant log line.
+check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
+
+# Package release ZIP (installer + nexus variants).
+package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release"] }
+
+# Cut a release: pixi run release <major|minor|patch|nightly|X.Y.Z>
+release = "powershell -ExecutionPolicy Bypass -File scripts/release.ps1"
+
+# Build + dev-deploy the debug .asi straight into <game>\bin. install.cmd is
+# the release-ZIP installer (deploys from a staged plugins\ folder) and is not
+# the dev path - it ships in the packaged release for the launcher / Nexus.
+install = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 Debug", depends-on = ["build"] }
+uninstall = "scripts\\uninstall.cmd"
+
+[dependencies]
