@@ -22,7 +22,7 @@ set "GAME_ID=half-life-2"
 set "MOD_DISPLAY_NAME=Half-Life 2 Head Tracking"
 set "MOD_DLLS=HalfLife2HeadTracking.asi"
 set "MOD_INTERNAL_NAME=HalfLife2HeadTracking"
-set "MOD_VERSION=0.0.0"
+set "MOD_VERSION=0.1.0"
 set "STATE_FILE=.headtracking-state.json"
 set "FRAMEWORK_TYPE=ASILoader"
 :: Filename the ASI loader DLL is renamed to: the import the game exe already
