@@ -12,7 +12,7 @@ An unofficial head tracking mod for Half-Life 2 that moves the view with your he
 
 ## Requirements
 
-- [Half-Life 2](https://store.steampowered.com/app/220/HalfLife_2/) on Steam (app 220), on the build whose `hl2\bin\client.dll` is dated 27 June 2025. On any other build the mod stays dormant and the game runs vanilla.
+- [Half-Life 2](https://store.steampowered.com/app/220/HalfLife_2/) on Steam (app 220), on the build whose `client.dll` is dated 27 June 2025. Both of app 220's branches are covered: the default one, which launches `-game hl2_complete` and plays Half-Life 2, Episode One and Episode Two as a single campaign, and `steam_legacy`, which launches `-game hl2`. On any other build the mod stays dormant and the game runs vanilla.
 - A tracking source that sends the OpenTrack UDP protocol, such as [OpenTrack](https://github.com/opentrack/opentrack/releases) with a webcam.
 - 64-bit Windows 10 or 11. The game itself is a 32-bit process, so the mod and its loader are both x86.
 
@@ -231,7 +231,7 @@ is in force. Attach it to a bug report.
 **Log says the mod is staying dormant**
 
 - Your `client.dll` is not in the mod's build profile registry. The log line names the direction: newer than the mod knows about (the game patched, check the Releases page), older (let Steam finish updating), or a repacked binary the mod will not engage on.
-- The episodes, Lost Coast and Deathmatch each load their own `client.dll` and are not in the registry. Only the base Half-Life 2 campaign is supported today.
+- The Episode One (app 380) and Episode Two (app 420) entries in your Steam library both load `episodic\bin\client.dll`, and Lost Coast and Deathmatch each load their own. None of those are in the registry. The episodes are head-tracked when you play them inside app 220, whose default campaign loads `hl2_complete\bin\client.dll`.
 
 **No tracking response**
 
