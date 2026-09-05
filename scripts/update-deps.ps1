@@ -16,6 +16,12 @@
 # bin\ with an altered search path, so a proxy at the game root is never
 # consulted, and winmm.dll is imported there - Half-Life 2 has no xinput import at
 # all). So the zip is staged in TEMP and only the DLL is vendored.
+#
+# The extracted DLL is NOT vendored as it comes: the x86 build embeds binkw32.dll
+# (RAD Game Tools, proprietary), wndmode.dll (VEG / menopem, no licence) and
+# vorbisfile.dll (Xiph.Org) as RCDATA resources, and the installer ZIP we publish
+# would redistribute all three. strip-loader-payload.ps1 zeroes them before the
+# copy is hashed and committed. Never skip that step.
 # ============================================================================
 
 Set-StrictMode -Version Latest
@@ -64,6 +70,15 @@ try {
         $archive.Dispose()
     }
 
+    $upstreamSha = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash.ToLower()
+
+    # Strip before the hash the idempotency check and the README use, so both see
+    # the file that actually gets committed.
+    Write-Host "    stripping the loader's embedded third-party DLLs..." -ForegroundColor DarkGray
+    $strip = Join-Path $scriptDir 'strip-loader-payload.ps1'
+    & $strip -Path $stagedDll
+    & $strip -Path $stagedDll -VerifyOnly   # throws if anything survived
+
     $dllSha = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash.ToLower()
 
     # Idempotency: an unchanged upstream must leave the tree clean. Rewriting
@@ -92,11 +107,32 @@ try {
             "- Commit: ``$($meta.CommitSha)``",
             "- Asset: ``$($meta.AssetName)``",
             "- Asset URL: $($meta.AssetUrl)",
-            "- dinput8.dll SHA-256: ``$dllSha``",
+            "- Upstream dinput8.dll SHA-256: ``$upstreamSha``",
+            "- Vendored dinput8.dll SHA-256: ``$dllSha`` (after the strip below)",
             "- Fetched at: $($meta.FetchedAt)",
             '',
-            '`dinput8.dll` is extracted from the upstream x86 zip untouched. install.cmd copies it',
-            'to <game>\bin\winmm.dll, the proxy slot Half-Life 2 loads ASI plugins through.'
+            'install.cmd copies `dinput8.dll` to <game>\bin\winmm.dll, the proxy slot Half-Life 2',
+            'loads ASI plugins through.',
+            '',
+            '## Modified: third-party payload stripped',
+            '',
+            'The upstream x86 loader carries three complete third-party DLLs as RCDATA resources,',
+            'so that a user who renames it over one of those libraries still gets the original',
+            'exports, plus the ini template one of them reads:',
+            '',
+            '- `binkw32.dll` - RAD Game Tools, Inc., Bink and Smacker 1.994i. Proprietary',
+            '  middleware licensed per title; we have no right to redistribute it.',
+            '- `wndmode.dll` - DirectX Windower Embedded v2.3, (C) 2008 VEG, (C) 2004 menopem.',
+            '  No licence accompanies it.',
+            '- `vorbisfile.dll` - Xiph.Org, BSD-3-Clause. Redistributable only with its notice.',
+            '',
+            '`scripts/strip-loader-payload.ps1` zeroes all three, and the windower ini template,',
+            'before the file is committed. Only the `.rsrc` section changes: the loader code, its',
+            'imports, relocations and appended PDB are byte-identical to upstream. Nothing in this',
+            'mod can reach the stripped resources - the two library payloads are keyed off the',
+            "loader's own filename, and we deploy it as `winmm.dll`, while the windower needs a",
+            '`wndmode.ini` we never ship. MIT permits the modification; it is recorded here and in',
+            'THIRD-PARTY-NOTICES.md so this copy is not mistaken for stock upstream.'
         ) -join "`n"
         # BOM-less UTF8 with LF endings, matching package-release.ps1: PS 5.1's
         # `Set-Content -Encoding utf8` writes a BOM and terminates the file with

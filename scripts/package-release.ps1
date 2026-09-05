@@ -27,6 +27,12 @@ if (-not (Test-Path $vendorDll)) {
     throw "Missing vendored loader: $vendorDll. Run: pixi run update-deps"
 }
 
+# The installer ZIP redistributes that binary, and the upstream x86 loader carries
+# binkw32.dll (RAD Game Tools, proprietary), wndmode.dll and vorbisfile.dll as
+# RCDATA resources. None of the three is ours to ship, so a loader that still
+# has them never reaches a release. See vendor/ultimate-asi-loader/README.md.
+& (Join-Path $PSScriptRoot 'strip-loader-payload.ps1') -Path $vendorDll -VerifyOnly
+
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 
 # ---------- Installer ZIP (GitHub Release) ----------

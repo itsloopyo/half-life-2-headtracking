@@ -37,6 +37,10 @@ clean-all = { cmd = """
 # Bump vendored ASI Loader. Manual; commit the diff. CI does not run this.
 update-deps = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/update-deps.ps1" }
 
+# Zero the third-party DLLs Ultimate ASI Loader carries as resources out of the
+# vendored copy. update-deps runs this; package re-runs it in -VerifyOnly mode.
+strip-loader = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/strip-loader-payload.ps1 -Path vendor/ultimate-asi-loader/dinput8.dll" }
+
 # Print the installed client.dll's PE fingerprint as a build-profile stub.
 # First step whenever a patch lands or a user reports the dormant log line.
 check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
