@@ -103,7 +103,7 @@ extern const BuildProfile kSteamProfile_20250627 = {
     "steam-win32-20250627",
     { 0x685DE804u, 0x00598000u, 0x00000000u },
     { 0x1E21C0u, kViewSetupLayout_2025, kAimLayout_20250627, kEngineState_20250627,
-      kFovConVars_20250627 },
+      kFovConVars_20250627, 0x1271B0u, 0x1174u },
 };
 
 // hl2_complete\bin\client.dll dated 2025-06-27, four seconds after the hl2 one
@@ -159,7 +159,8 @@ extern const BuildProfile kSteamProfile_Hl2Complete_20250627 = {
     "steam-win32-hl2complete-20250627",
     { 0x685DE808u, 0x0059A000u, 0x00000000u },
     { 0x1E25D0u, kViewSetupLayout_2025, kAimLayout_Hl2Complete_20250627,
-      kEngineState_Hl2Complete_20250627, kFovConVars_Hl2Complete_20250627 },
+      kEngineState_Hl2Complete_20250627, kFovConVars_Hl2Complete_20250627,
+      0x127460u, 0x1174u },
 };
 
 }  // namespace headtracking::builds

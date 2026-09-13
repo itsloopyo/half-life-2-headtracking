@@ -48,6 +48,7 @@ add_library(HalfLife2HeadTracking SHARED
     src/detour.cpp
     src/camera_hook.cpp
     src/fov_override.cpp
+    src/flashlight_hook.cpp
     src/aim_state.cpp
     src/aim_point.cpp
     src/crosshair_hook.cpp

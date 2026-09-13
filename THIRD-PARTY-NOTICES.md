@@ -6,7 +6,7 @@ was compiled against and reproduces the upstream notice its licence requires.
 
 ## cameraunlock-core
 
-- **Version:** 29b11b62f183183295d435b7292d8c1c0a8e5cff
+- **Version:** ee8cc72899932c60c8fe539fcb6e18db408d1d96
 - **License:** MIT
 - **Upstream:** https://github.com/itsloopyo/cameraunlock-core
 - **Usage:** Shared head tracking library supplying the UDP receiver, pose interpolation and smoothing, INI reading, hotkey polling, PE fingerprinting and the hook manager.

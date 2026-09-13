@@ -45,6 +45,8 @@ void TestShippedSteamProfiles() {
         Check(p->HasAimOffsets(), "carries the aim addresses");
         Check(p->HasEngineState(), "carries the gameplay gate");
         Check(p->HasFovConVars(), "carries the FOV cvars");
+        Check(p->offsets.flashlight_update_rva != 0 && p->offsets.player_flashlight != 0,
+              "carries the local flashlight update and ownership offsets");
         Check(TraceFieldsFitBuffer(p->offsets.aim),
               "its trace_t offsets are read inside the trace buffer");
     }

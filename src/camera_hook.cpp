@@ -30,12 +30,14 @@
 #include "aim_state.h"
 #include "angles.h"
 #include "builds/build_registry.h"
+#include "cameraunlock/effects/head_follow_light.h"
 #include "cameraunlock/hooks/hook_manager.h"
 #include "cameraunlock/memory/pe_fingerprint.h"
 #include "config.h"
 #include "debug_log.h"
 #include "detour.h"
 #include "fov_override.h"
+#include "flashlight_hook.h"
 #include "game_state.h"
 #include "log_throttle.h"
 #include "plugin.h"
@@ -148,10 +150,12 @@ void ApplyPositionalLean(const Plugin& plugin, const float* cleanAngles, float* 
 // Composes the head rotation onto the render view's QAngle, in the yaw mode the
 // player has selected. `delta` receives the applied rotation in Source degrees.
 void ApplyRotationDelta(const Plugin& plugin, float yawRad, float pitchRad, float rollRad,
-                        float* ang, TrackingDelta& delta) {
+                        float* ang, float* lightAngles, TrackingDelta& delta) {
     delta.pitch = pitchRad * kRadToDeg * kPitchSign;
     delta.yaw   = yawRad   * kRadToDeg * kYawSign;
     delta.roll  = rollRad  * kRadToDeg * kRollSign;
+    const auto light = cameraunlock::effects::ScaleHeadEuler(
+        {delta.yaw, delta.pitch, delta.roll}, cameraunlock::effects::kDefaultLightMultiplier);
 
     if (plugin.IsWorldSpaceYaw()) {
         // Source QAngle is intrinsically horizon-locked - yaw is about world
@@ -160,8 +164,12 @@ void ApplyRotationDelta(const Plugin& plugin, float yawRad, float pitchRad, floa
         ang[0] += delta.pitch;
         ang[1] += delta.yaw;
         ang[2] += delta.roll;
+        lightAngles[0] += light.pitch;
+        lightAngles[1] += light.yaw;
+        lightAngles[2] += light.roll;
     } else {
         source::ApplyCameraLocalRotation(ang, delta.pitch, delta.yaw, delta.roll);
+        source::ApplyCameraLocalRotation(lightAngles, light.pitch, light.yaw, light.roll);
     }
 }
 
@@ -189,6 +197,7 @@ void ApplyTracking(const ViewSetup& view) {
     AimState aim;
     Copy3(aim.clean_origin, org);
     Copy3(aim.clean_angles, ang);
+    Copy3(aim.light_angles, ang);
 
     TrackingDelta delta;
     if (active) {
@@ -206,7 +215,7 @@ void ApplyTracking(const ViewSetup& view) {
             // Position first: it reads the clean angles, which the rotation
             // below overwrites in place.
             ApplyPositionalLean(plugin, aim.clean_angles, org, delta);
-            ApplyRotationDelta(plugin, yawRad, pitchRad, rollRad, ang, delta);
+            ApplyRotationDelta(plugin, yawRad, pitchRad, rollRad, ang, aim.light_angles, delta);
         }
     }
 
@@ -232,7 +241,9 @@ void __fastcall Hook_RenderView(void* ecx, void* edx, void* view, int clearFlags
         }
     }
 
+    if (view) BeginFlashlightView(CurrentAimState());
     g_originalRenderView(ecx, edx, view, clearFlags, whatToDraw);
+    EndFlashlightView();
 }
 
 // ----- Installation ---------------------------------------------------------
@@ -312,7 +323,9 @@ bool CameraHook::Install() {
 
     void* target = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(client)
                                            + g_profile->offsets.render_view_rva);
-    return InstallRenderViewDetour(target);
+    if (!InstallRenderViewDetour(target)) return false;
+    InstallFlashlightHook(client, *g_profile);
+    return true;
 }
 
 }  // namespace headtracking

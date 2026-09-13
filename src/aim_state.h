@@ -27,6 +27,7 @@ struct AimState {
     float clean_angles[3]  = {0.0f, 0.0f, 0.0f};  // QAngle the game aims along
     float render_origin[3] = {0.0f, 0.0f, 0.0f};  // eye the frame is drawn from
     float render_angles[3] = {0.0f, 0.0f, 0.0f};  // QAngle the frame renders with
+    float light_angles[3] = {0.0f, 0.0f, 0.0f};
 };
 
 // Called once per frame by the render-view detour, before the original call.

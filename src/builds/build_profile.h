@@ -95,6 +95,8 @@ struct OffsetTable {
     AimOffsets aim;
     EngineStateOffsets engine;
     FovConVarOffsets fov;
+    uint32_t flashlight_update_rva;
+    uint32_t player_flashlight;
 };
 
 // One entry per shipped Half-Life 2 client.dll build we have offsets for. The
