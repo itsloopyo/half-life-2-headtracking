@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0] - 2026-09-13
+
+### Added
+
+- make the flashlight follow head rotation at 1.5x
+
+### Fixed
+
+- strip the loader's embedded third-party DLLs
+- resolve the loader path before reading it
+
 ## [Unreleased]
 
 ### Changed
@@ -23,4 +34,3 @@
 ## [0.1.0] - 2026-08-31
 
 First release.
-
