@@ -8,7 +8,7 @@ An unofficial head tracking mod for Half-Life 2 that moves the view with your he
 
 - **Decoupled look and aim** - your head moves the camera the frame is rendered from, while the mouse or controller still controls where you shoot. The player's own eye angles and position are never written, so weapon fire, traces, physics and NPC behavior are unchanged.
 - **6DOF tracking** - yaw, pitch and roll, plus positional lean, peek and duck.
-- **Any OpenTrack compatible source** - webcam, phone app, TrackIR, or anything else that sends the OpenTrack UDP protocol.
+- **Works with any OpenTrack compatible tracker** - free options available for PC, iOS and Android
 
 ## Requirements
 
@@ -17,6 +17,13 @@ An unofficial head tracking mod for Half-Life 2 that moves the view with your he
 - 64-bit Windows 10 or 11. The game itself is a 32-bit process, so the mod and its loader are both x86.
 
 ## Installation
+
+### Lopari
+
+Download [Lopari](https://lopari.app), choose **Half-Life 2**, and click
+**Play with head tracking**.
+
+### Standalone Installer
 
 1. Download the installer ZIP (`HalfLife2HeadTracking-v<version>-installer.zip`) from the [Releases page](https://github.com/itsloopyo/half-life-2-headtracking/releases).
 2. Extract it anywhere.
