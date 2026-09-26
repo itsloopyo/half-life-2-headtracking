@@ -29,6 +29,25 @@ endif()
 
 add_test(NAME hl2_headtracking_tests COMMAND hl2_headtracking_tests)
 
+# CameraUnlock.ini: the committed file against the table, a first start, the toggles' saves and
+# the legacy file's ANSI path. `--render-config <path>` makes it write the committed file
+# instead (pixi run render-config).
+add_executable(hl2_config_tests
+    config_tests.cpp
+    ${CMAKE_SOURCE_DIR}/src/config.cpp
+    ${CMAKE_SOURCE_DIR}/src/legacy_config/legacy_config.cpp
+)
+target_include_directories(hl2_config_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(hl2_config_tests PRIVATE cameraunlock)
+target_compile_definitions(hl2_config_tests PRIVATE
+    HL2_COMMITTED_CONFIG="${CMAKE_SOURCE_DIR}/config/CameraUnlock.ini")
+if(MSVC)
+    target_compile_options(hl2_config_tests PRIVATE /W4 /WX)
+else()
+    target_compile_options(hl2_config_tests PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME hl2_config_tests COMMAND hl2_config_tests)
+
 # The differential test for the HeadTracking.ini reader. The oracle is the reader of the newest
 # published build (v0.2.0), compiled from its own sources in config_differential/oracle with the
 # mod's and core's namespaces renamed, so it links beside today's code and nothing in it can
@@ -52,6 +71,7 @@ target_compile_definitions(hl2_config_oracle PRIVATE
 
 add_executable(hl2_config_differential_tests
     config_differential/differential_tests.cpp
+    ${CMAKE_SOURCE_DIR}/src/config.cpp
     ${CMAKE_SOURCE_DIR}/src/legacy_config/legacy_config.cpp
 )
 target_include_directories(hl2_config_differential_tests PRIVATE
@@ -66,3 +86,10 @@ else()
     target_compile_options(hl2_config_differential_tests PRIVATE -Wall -Wextra -Werror)
 endif()
 add_test(NAME hl2_config_differential_tests COMMAND hl2_config_differential_tests)
+
+# Core's canonical config lint over the committed file and every file the differential test
+# migrated, which it writes beside itself under migrated.
+add_test(NAME hl2_config_lint COMMAND node
+    ${CMAKE_CURRENT_SOURCE_DIR}/config_differential/lint-migrated.mjs
+    $<TARGET_FILE_DIR:hl2_config_differential_tests>/migrated)
+set_tests_properties(hl2_config_lint PROPERTIES DEPENDS hl2_config_differential_tests)

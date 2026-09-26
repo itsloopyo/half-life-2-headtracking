@@ -47,6 +47,16 @@ strip-loader = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/strip-l
 # First step whenever a patch lands or a user reports the dormant log line.
 check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
 
+# Rewrite config/CameraUnlock.ini, the committed copy of the file the mod creates at first
+# launch, from the config table after a change to a row, a comment or a default, then rewrite the
+# per_game of launcher-manifest.json's config descriptor from it. hl2_config_tests fails while
+# the two differ.
+render-config = { cmd = "build/tests/Debug/hl2_config_tests.exe --render-config config/CameraUnlock.ini && node cameraunlock-core/scripts/encode-seed.mjs", depends-on = ["build"] }
+
+# Checks the newest installer and Nexus ZIPs in release/ against core's manifest and config
+# rules. Run it after package.
+validate-manifest = "node cameraunlock-core/scripts/validate-manifest.mjs"
+
 # Package release ZIP (installer + nexus variants). Depends on test, so no ZIP is built from a
 # tree whose tests or config differential test fail.
 package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release", "test"] }

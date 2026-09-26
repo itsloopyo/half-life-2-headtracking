@@ -59,7 +59,8 @@ void UpdateTrackedLight(void* light, const float* origin, const float* forward,
 void __fastcall HookUpdateLight(void* light, void*, const float* origin,
                                 const float* forward, const float* right,
                                 const float* up, int distance) {
-    if (light != LocalFlashlight()) {
+    // LightFollowsHead=false leaves the beam as the game aims it, from the game's own eye.
+    if (light != LocalFlashlight() || !GetPlugin().GetConfig().light.follows_head) {
         g_original(light, nullptr, origin, forward, right, up, distance);
         return;
     }

@@ -40,8 +40,8 @@ $installerStage = Join-Path $outDir "$modSlug-installer-stage"
 if (Test-Path $installerStage) { Remove-Item $installerStage -Recurse -Force }
 New-Item -ItemType Directory -Path $installerStage | Out-Null
 
-# Mod payload deployed to <game>\bin by install.cmd. HeadTracking.ini is
-# created by the mod on first launch, so it is not shipped here.
+# Mod payload deployed to <game>\bin by install.cmd. The mod creates
+# CameraUnlock.ini on first launch, so no config is shipped here.
 $pluginsDir = Join-Path $installerStage 'plugins'
 New-Item -ItemType Directory -Path $pluginsDir | Out-Null
 Copy-Item $asiPath $pluginsDir
