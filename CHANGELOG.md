@@ -11,8 +11,6 @@
 - strip the loader's embedded third-party DLLs
 - resolve the loader path before reading it
 
-## [Unreleased]
-
 ### Changed
 
 - The vendored Ultimate ASI Loader no longer carries the three third-party DLLs
