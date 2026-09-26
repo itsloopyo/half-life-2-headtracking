@@ -24,7 +24,8 @@ setup = { cmd = """
 build = { cmd = "cmake --build build --config Debug", depends-on = ["setup"] }
 build-release = { cmd = "cmake --build build --config Release", depends-on = ["setup"] }
 
-# Characterization tests for the mod's pure logic (tests/). No game needed.
+# Characterization tests for the mod's pure logic (tests/), and the config differential test,
+# which holds the frozen HeadTracking.ini reader to the newest published build's. No game needed.
 test = { cmd = "ctest --test-dir build -C Debug --output-on-failure", depends-on = ["build"] }
 
 clean = { cmd = """
@@ -46,8 +47,9 @@ strip-loader = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/strip-l
 # First step whenever a patch lands or a user reports the dormant log line.
 check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
 
-# Package release ZIP (installer + nexus variants).
-package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release"] }
+# Package release ZIP (installer + nexus variants). Depends on test, so no ZIP is built from a
+# tree whose tests or config differential test fail.
+package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release", "test"] }
 
 # Cut a release: pixi run release <major|minor|patch|nightly|X.Y.Z>
 release = "powershell -ExecutionPolicy Bypass -File scripts/release.ps1"
@@ -59,3 +61,6 @@ install = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 D
 uninstall = "scripts\\uninstall.cmd"
 
 [dependencies]
+# CMake and Visual Studio come from the system. Node runs the manifest and config checks
+# packaging calls at this core pin, pinned to the build cameraunlock-core's own lock resolved.
+nodejs = "==26.5.0"

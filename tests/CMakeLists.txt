@@ -28,3 +28,41 @@ else()
 endif()
 
 add_test(NAME hl2_headtracking_tests COMMAND hl2_headtracking_tests)
+
+# The differential test for the HeadTracking.ini reader. The oracle is the reader of the newest
+# published build (v0.2.0), compiled from its own sources in config_differential/oracle with the
+# mod's and core's namespaces renamed, so it links beside today's code and nothing in it can
+# resolve to a symbol of the mod under test. Its include roots put the published build's files
+# ahead of core's headers.
+set(HL2_CORE_CPP ${CMAKE_SOURCE_DIR}/cameraunlock-core/cpp)
+add_library(hl2_config_oracle STATIC
+    config_differential/oracle_api.cpp
+    config_differential/oracle/src/config.cpp
+    ${HL2_CORE_CPP}/src/config/ini_reader.cpp
+    ${HL2_CORE_CPP}/src/logging/file_log.cpp
+)
+target_include_directories(hl2_config_oracle PRIVATE
+    config_differential/oracle/src
+    ${HL2_CORE_CPP}/include
+)
+target_compile_definitions(hl2_config_oracle PRIVATE
+    headtracking=hl2_oracle
+    cameraunlock=hl2_oracle_core
+)
+
+add_executable(hl2_config_differential_tests
+    config_differential/differential_tests.cpp
+    ${CMAKE_SOURCE_DIR}/src/legacy_config/legacy_config.cpp
+)
+target_include_directories(hl2_config_differential_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    config_differential
+)
+target_link_libraries(hl2_config_differential_tests PRIVATE hl2_config_oracle cameraunlock bcrypt)
+target_compile_definitions(hl2_config_differential_tests PRIVATE HL2_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+if(MSVC)
+    target_compile_options(hl2_config_differential_tests PRIVATE /W4 /WX)
+else()
+    target_compile_options(hl2_config_differential_tests PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME hl2_config_differential_tests COMMAND hl2_config_differential_tests)
