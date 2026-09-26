@@ -40,7 +40,7 @@ std::string KeyList(int vk, char letter, const char* key, std::vector<DroppedVal
 ImportResult Import(const LegacyInput& input, Config& out) {
     // v0.2.0 opened the file by the ANSI path of hl2.exe's folder. Where that path has a
     // character the code page cannot hold, core's HostExeDirectoryNarrow refused it, and the
-    // build fell back to the bare name "HeadTracking.ini", which GetPrivateProfileString looks
+    // build fell back to the bare name "HeadTracking.ini", which the Windows profile API looks
     // up in the Windows folder, not beside hl2.exe: it never read the player's file and ran on
     // its defaults.
     legacy::Config c;
