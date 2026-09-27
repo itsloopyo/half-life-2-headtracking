@@ -18,15 +18,20 @@
 // reader was frozen at, and every core source either reader compiles holds the same bytes at
 // ee8cc72 and at the pin, which SourcesAreThePinnedOnes checks.
 //
-// Comparison 2, import against migration, is the proof for the conversion. It allows the one
-// approved change core's data/config-format.json records that applies here, and nothing else:
+// Comparison 2, import against migration, is the proof for the conversion. It allows what core's
+// data/config-format.json records that applies here, and nothing else:
 //
 //   pose_shaping  a sensitivity, inversion, deadzone or WorldScale the player set away from the
 //                 shipped value is dropped, and the session runs at the shipped value, which the
 //                 code now applies: identity, and kWorldUnitsPerMetre for WorldScale.
+//   N3            a hotkey code on a Ctrl, Shift or Alt key alone is unbound and logged, and the
+//                 action keeps its Ctrl+Shift chord.
+//   untouched     a setting the player never changed from what v0.2.0 shipped follows Defaults.ini
+//                 (owner rule of 2026-09-26): the migration writes it `default`, and the session
+//                 runs on what Defaults.ini gives it. The mode pair goes as one unit.
 //
 // The reader replaces a float that is not finite, clamps the smoothing pair into 0 to 1, and
-// keeps every hotkey code inside 0x01-0xFE, so neither normalisation can apply. It reads the
+// keeps every hotkey code inside 0x01-0xFE, so neither N1 nor N2 can apply. It reads the
 // four limits with no upper bound, and the canonical rows take 0 to 10 metres; core has no rule
 // for a value outside a concept's range, so the owner defers such a file, the session runs on
 // what the import read, and nothing is created or saved (kUnrepresentable).
@@ -37,9 +42,9 @@
 //
 // Each input with a file migrates three times: over a Defaults.ini the owner creates with the
 // built-in values, from a read-only HeadTracking.ini, and over a Defaults.ini that differs from
-// the built-in value on every global row. All three give the settings the import read, since
-// the migration writes `default` only where the imported value is what `default` gives at that
-// launch.
+// the built-in value on every global row. A setting the player changed runs as the import read
+// it in all three; one the player never changed runs as Defaults.ini says, which over the
+// built-in values is what v0.2.0 shipped, since every one of its defaults is the schema's.
 //
 // Inputs: the published build's first-run file (no build shipped or seeded a config, so every
 // player's file started as that one), no file, an empty file, core's corpus of mutations of the
@@ -601,8 +606,91 @@ Allowed ApplyApprovedChanges(const headtracking::legacy::Config& read) {
     o.deadzone_yaw = o.deadzone_pitch = o.deadzone_roll = 0.0f;
     o.pos_sens_x = o.pos_sens_y = o.pos_sens_z = 1.0f;
     o.scale_x = o.scale_y = o.scale_z = 39.37f;
+
+    const std::tuple<Action, int, const char*> codes[] = {
+        {kToggle, read.toggle_vk, "Toggle"}, {kYawMode, read.yaw_mode_vk, "YawMode"}, {kCycleMode, read.mode_cycle_vk, "ModeCycle"}};
+    for (const auto& [action, vk, key] : codes) {
+        const bool modifier = (vk >= 0x10 && vk <= 0x12) || (vk >= 0xA0 && vk <= 0xA5);
+        if (!modifier) continue;
+        a.dropped.push_back({cfg::DropRule::ModifierKey, "Hotkeys", key});
+        o.hotkeys.erase(std::find(o.hotkeys.begin(), o.hotkeys.end(), Hotkey{action, vk, kPlain}));
+    }
     std::sort(a.dropped.begin(), a.dropped.end());
     return a;
+}
+
+using cfg::schema::Concept;
+
+// The rows a setting the player never changed leaves to Defaults.ini, worked out here from what
+// the frozen reader read against the frozen defaults, not taken from the import.
+std::vector<Concept> Untouched(const headtracking::legacy::Config& read) {
+    const headtracking::legacy::Config shipped;
+    std::vector<Concept> out;
+    const auto row = [&out](bool unchanged, std::initializer_list<Concept> ids) {
+        if (unchanged) out.insert(out.end(), ids);
+    };
+    row(read.port == shipped.port, {Concept::UdpPort});
+    row(read.enabled_on_startup == shipped.enabled_on_startup, {Concept::EnableOnStartup});
+    row(read.world_space_yaw == shipped.world_space_yaw, {Concept::WorldSpaceYaw});
+    row(read.pos_enabled == shipped.pos_enabled, {Concept::RotationEnabled, Concept::PositionEnabled});
+    row(read.local_smoothing == shipped.local_smoothing, {Concept::LocalSmoothing});
+    row(read.remote_smoothing == shipped.remote_smoothing, {Concept::RemoteSmoothing});
+    row(read.pos_limit_x == shipped.pos_limit_x, {Concept::PositionLimitX});
+    row(read.pos_limit_y == shipped.pos_limit_y, {Concept::PositionLimitY, Concept::PositionLimitYDown});
+    row(read.pos_limit_z == shipped.pos_limit_z, {Concept::PositionLimitZ});
+    row(read.pos_limit_z_back == shipped.pos_limit_z_back, {Concept::PositionLimitZBack});
+    row(read.toggle_vk == shipped.toggle_vk, {Concept::ToggleKey});
+    row(read.mode_cycle_vk == shipped.mode_cycle_vk, {Concept::CycleTrackingModeKey});
+    row(read.yaw_mode_vk == shipped.yaw_mode_vk, {Concept::YawModeKey});
+    row(true, {Concept::LightFollowsHead, Concept::LightMultiplier});
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// The import names the mode by either half; the test by both.
+std::vector<Concept> Named(std::vector<Concept> ids) {
+    if (std::find(ids.begin(), ids.end(), Concept::RotationEnabled) != ids.end() ||
+        std::find(ids.begin(), ids.end(), Concept::PositionEnabled) != ids.end()) {
+        ids.push_back(Concept::RotationEnabled);
+        ids.push_back(Concept::PositionEnabled);
+    }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    return ids;
+}
+
+// `want` with every row in `untouched` at what `defaults`, the settings Defaults.ini gives, has.
+Observed FollowDefaults(Observed want, const std::vector<Concept>& untouched, const Observed& defaults) {
+    const auto has = [&untouched](Concept id) {
+        return std::find(untouched.begin(), untouched.end(), id) != untouched.end();
+    };
+    if (has(Concept::UdpPort)) want.port = defaults.port;
+    if (has(Concept::EnableOnStartup)) want.start_enabled = defaults.start_enabled;
+    if (has(Concept::WorldSpaceYaw)) want.start_world_yaw = defaults.start_world_yaw;
+    if (has(Concept::RotationEnabled)) want.start_mode = defaults.start_mode;
+    if (has(Concept::LocalSmoothing)) want.local_smoothing = defaults.local_smoothing;
+    if (has(Concept::RemoteSmoothing)) want.remote_smoothing = defaults.remote_smoothing;
+    if (has(Concept::PositionLimitX)) want.limit_x = defaults.limit_x;
+    if (has(Concept::PositionLimitY)) want.limit_y = defaults.limit_y;
+    if (has(Concept::PositionLimitYDown)) want.limit_y_down = defaults.limit_y_down;
+    if (has(Concept::PositionLimitZ)) want.limit_z = defaults.limit_z;
+    if (has(Concept::PositionLimitZBack)) want.limit_z_back = defaults.limit_z_back;
+    if (has(Concept::LightFollowsHead)) want.light_follows_head = defaults.light_follows_head;
+    if (has(Concept::LightMultiplier)) want.light_multiplier = defaults.light_multiplier;
+    const std::pair<Concept, Action> keys[] = {
+        {Concept::ToggleKey, kToggle}, {Concept::CycleTrackingModeKey, kCycleMode}, {Concept::YawModeKey, kYawMode}};
+    for (const auto& [id, action] : keys) {
+        if (!has(id)) continue;
+        const int a = action;
+        want.hotkeys.erase(std::remove_if(want.hotkeys.begin(), want.hotkeys.end(),
+                                          [a](const Hotkey& h) { return std::get<0>(h) == a; }),
+                           want.hotkeys.end());
+        for (const Hotkey& h : defaults.hotkeys) {
+            if (std::get<0>(h) == a) want.hotkeys.push_back(h);
+        }
+    }
+    std::sort(want.hotkeys.begin(), want.hotkeys.end());
+    return want;
 }
 
 // v0.2.0 read the four [Position] limits with no upper bound, and the canonical rows take 0 to 10
@@ -699,7 +787,7 @@ fs::path MigratedFolder() {
 // nothing, checks what a load must do beyond comparison 2, and returns the settings the session
 // runs on. A file it creates by migrating goes into `migrated_files`.
 headtracking::Config Migrate(const Input& input, const Scratch& s, const std::string& label, bool deferred,
-                             std::set<std::string>& migrated_files) {
+                             const std::vector<Concept>& untouched, std::set<std::string>& migrated_files) {
     const fs::path legacy = fs::path(s.wini());
     const std::optional<FileState> legacy_before = StateOf(legacy);
     const std::set<std::string> both{"CameraUnlock.ini", "HeadTracking.ini"};
@@ -731,6 +819,11 @@ headtracking::Config Migrate(const Input& input, const Scratch& s, const std::st
     const std::string migrated = ReadFileBytes(s.canonical());
     Check(cfg::HasCanonicalStamp(migrated), label + ": CameraUnlock.ini carries the stamp");
     Check(AsciiCrlf(migrated), label + ": CameraUnlock.ini is ASCII with CRLF line ends");
+    for (const Concept id : untouched) {
+        const std::string row = std::string(cfg::schema::kConcepts[static_cast<std::size_t>(id)].name) + "=default";
+        Check(migrated.find("\r\n" + row + "\r\n") != std::string::npos,
+              label + ": a setting the player never changed is written " + row);
+    }
     if (input.present) migrated_files.insert(migrated);
 
     // The next start reads CameraUnlock.ini, imports nothing and writes nothing.
@@ -752,6 +845,14 @@ headtracking::Config Migrate(const Input& input, const Scratch& s, const std::st
 void ImportAgainstMigration(const std::vector<Input>& inputs) {
     const std::string committed = ReadFileBytes(SourcePath("config/CameraUnlock.ini"));
     const cfg::ConfigTable<headtracking::Config> table = headtracking::MakeConfigTable();
+    // What Defaults.ini gives each global row: the built-in values, and kSkewedDefaults', which
+    // differs on every one of them, so a row wrongly left to or kept from Defaults.ini shows.
+    const Observed builtin = ObserveCanonical(table.defaults());
+    headtracking::Config skewed_config;
+    CanonicalDiagnostics(kSkewedDefaults, skewed_config);
+    const Observed skewed_defaults = ObserveCanonical(skewed_config);
+    Check(Differences(builtin, skewed_defaults).size() == 14,
+          "the skewed Defaults.ini differs from the built-in values on every global row");
     std::set<std::string> migrated_files;
     int compared = 0;
     int deferred_inputs = 0;
@@ -782,17 +883,19 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
         for (const cfg::DroppedValue& d : imported.dropped) dropped.push_back({d.rule, d.section, d.key});
         std::sort(dropped.begin(), dropped.end());
         Check(dropped == allowed.dropped, name + ": the import drops exactly what the approved changes drop");
+        const std::vector<Concept> untouched = Untouched(read);
+        Check(Named(imported.follows_defaults_ini) == untouched,
+              name + ": the import leaves to Defaults.ini exactly the settings the player never changed");
         Check(imported.pose_shaping.size() == 16, name + ": the import records all sixteen pose-shaping settings");
         for (const cfg::PoseShapingValue& p : imported.pose_shaping) {
             const bool changed = std::find(allowed.dropped.begin(), allowed.dropped.end(),
                                            Drop{cfg::DropRule::PoseShaping, p.section, p.key}) != allowed.dropped.end();
             Check(p.folded != changed, name + ": [" + p.section + "] " + p.key + " folds exactly when it is the shipped value");
         }
-        const Observed& want = allowed.observed;
         const bool deferred = input.present && Unrepresentable(read);
         if (deferred) ++deferred_inputs;
 
-        const auto compare = [&](const headtracking::Config& got, const std::string& label) {
+        const auto compare = [&](const headtracking::Config& got, const Observed& want, const std::string& label) {
             const std::vector<std::string> diff = Differences(want, ObserveCanonical(got));
             for (const std::string& d : diff) std::printf("  comparison 2, %s: %s\n", label.c_str(), d.c_str());
             Check(diff.empty(), "comparison 2: the session runs as the import read, less the approved changes: " + label);
@@ -803,8 +906,8 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
         {
             Scratch s;
             if (input.present) s.Write(input.bytes);
-            const headtracking::Config migrated = Migrate(input, s, name, deferred, migrated_files);
-            compare(migrated, name);
+            const headtracking::Config migrated = Migrate(input, s, name, deferred, untouched, migrated_files);
+            compare(migrated, FollowDefaults(allowed.observed, untouched, builtin), name);
             if (!deferred) {
                 headtracking::Config reread;
                 CanonicalDiagnostics(ReadFileBytes(s.canonical()), reread);
@@ -824,7 +927,8 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
             Scratch ro;
             ro.Write(input.bytes);
             SetFileAttributesA(ro.ini().c_str(), FILE_ATTRIBUTE_READONLY);
-            compare(Migrate(input, ro, name + " (read-only)", deferred, migrated_files), name + " (read-only)");
+            compare(Migrate(input, ro, name + " (read-only)", deferred, untouched, migrated_files),
+                    FollowDefaults(allowed.observed, untouched, builtin), name + " (read-only)");
             Check((GetFileAttributesA(ro.ini().c_str()) & FILE_ATTRIBUTE_READONLY) != 0,
                   name + ": HeadTracking.ini keeps its read-only attribute");
         }
@@ -835,8 +939,8 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
             Scratch skewed;
             skewed.Write(input.bytes);
             skewed.WriteDefaults(kSkewedDefaults);
-            compare(Migrate(input, skewed, name + " (skewed Defaults.ini)", deferred, migrated_files),
-                    name + " (skewed Defaults.ini)");
+            compare(Migrate(input, skewed, name + " (skewed Defaults.ini)", deferred, untouched, migrated_files),
+                    FollowDefaults(allowed.observed, untouched, skewed_defaults), name + " (skewed Defaults.ini)");
         }
         ++compared;
     }
