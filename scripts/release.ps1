@@ -79,22 +79,6 @@ function Set-ModVersion {
     [System.IO.File]::WriteAllText($versionPath, $raw)
 }
 
-# Mirrors New-ChangelogFromCommits' insertion so a -Force maintenance entry
-# lands in the same place with the same shape.
-function Add-MaintenanceChangelogEntry {
-    param([string]$Path, [string]$NewVersion)
-    $date = Get-Date -Format 'yyyy-MM-dd'
-    $entry = "## [$NewVersion] - $date`n`n### Changed`n`n- Maintenance release (no user-facing changes).`n`n"
-    $changelog = Get-Content $Path -Raw
-    if ($changelog -match '(?s)(# Changelog.*?)(## \[)') {
-        $changelog = $changelog -replace '(?s)(# Changelog.*?\n\n)', "`$1$entry"
-    } else {
-        $changelog = $changelog -replace '(?s)(# Changelog.*?\n)', "`$1$entry"
-    }
-    $changelog = $changelog.TrimEnd() + "`n"
-    Set-Content $Path $changelog -NoNewline
-}
-
 Write-Host ''
 Write-Host '=== Half-Life 2 Head Tracking Release ===' -ForegroundColor Cyan
 Write-Host ''
@@ -147,23 +131,15 @@ Write-Host ''
 # before mutating any version file means an abort leaves the tree clean rather
 # than stranding a half-applied bump with no tag.
 Write-Host 'Generating CHANGELOG from commits...' -ForegroundColor Cyan
-$hasTags = git tag -l 2>$null
-if (-not $hasTags) {
-    $date = Get-Date -Format 'yyyy-MM-dd'
-    Set-Content $changelogPath "# Changelog`n`n## [$Version] - $date`n`nFirst release.`n"
-} else {
-    try {
-        New-ChangelogFromCommits -ChangelogPath $changelogPath -Version $Version `
-            -ArtifactPaths @('src/', 'cameraunlock-core', 'scripts/')
-    } catch {
-        if (-not $Force) {
-            Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host 'No user-facing changes to release. Re-run with -Force for a maintenance release.' -ForegroundColor Yellow
-            exit 1
-        }
-        Write-Host 'No user-facing commits since last tag - writing maintenance entry (-Force).' -ForegroundColor Yellow
-        Add-MaintenanceChangelogEntry -Path $changelogPath -NewVersion $Version
+try {
+    New-ChangelogFromCommits -ChangelogPath $changelogPath -Version $Version `
+        -ArtifactPaths @('src/', 'cameraunlock-core', 'scripts/') -Maintenance:$Force
+} catch {
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    if (-not $Force) {
+        Write-Host 'No user-facing changes to release. Re-run with -Force for a maintenance release.' -ForegroundColor Yellow
     }
+    exit 1
 }
 
 # Step 2 - src/version.h is the canonical version: the packager reads it to name
