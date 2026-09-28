@@ -64,12 +64,17 @@ ImportResult Import(const LegacyInput& input, Config& out) {
     out.remote_smoothing = c.remote_smoothing;
     out.position.remote_smoothing = c.remote_smoothing;
 
-    // The old file had one vertical limit, which the old runtime applied both ways.
-    out.position.limit_x = c.pos_limit_x;
-    out.position.limit_y = c.pos_limit_y;
-    out.position.limit_y_down = c.pos_limit_y;
-    out.position.limit_z = c.pos_limit_z;
-    out.position.limit_z_back = c.pos_limit_z_back;
+    // The old file had one vertical limit, which the old runtime applied both ways. v0.2.0 read
+    // the limits with no upper bound, and the rows take 0 to 10, so a limit above 10 imports as 10
+    // (N4). The comparison below takes the value as read: the player set it.
+    using cameraunlock::config::LegacyClampToRange;
+    using cameraunlock::config::schema::Concept;
+    out.position.limit_x = LegacyClampToRange<Concept::PositionLimitX>(c.pos_limit_x, "Position", "LimitX", dropped);
+    out.position.limit_y = LegacyClampToRange<Concept::PositionLimitY>(c.pos_limit_y, "Position", "LimitY", dropped);
+    out.position.limit_y_down = out.position.limit_y;
+    out.position.limit_z = LegacyClampToRange<Concept::PositionLimitZ>(c.pos_limit_z, "Position", "LimitZ", dropped);
+    out.position.limit_z_back =
+        LegacyClampToRange<Concept::PositionLimitZBack>(c.pos_limit_z_back, "Position", "LimitZBack", dropped);
 
     out.fov_override = c.fov_override;
     out.fov_viewmodel_override = c.fov_viewmodel_override;
@@ -101,7 +106,6 @@ ImportResult Import(const LegacyInput& input, Config& out) {
 
     // A setting the player never changed from what v0.2.0 shipped follows Defaults.ini. LimitY
     // stood for both vertical bounds, and the light rows are new.
-    using cameraunlock::config::schema::Concept;
     const legacy::Config shipped;
     cameraunlock::config::LegacyFollowsDefaultsIni follows;
     follows.Setting(Concept::UdpPort, c.port, shipped.port);
