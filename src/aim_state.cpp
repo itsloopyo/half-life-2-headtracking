@@ -7,10 +7,14 @@ namespace headtracking {
 namespace {
 
 AimState g_state;
+unsigned g_frame = 0;
 
 }  // namespace
 
-void PublishAimState(const AimState& state) { g_state = state; }
+void PublishAimState(const AimState& state) {
+    g_state = state;
+    g_state.frame = ++g_frame;
+}
 
 const AimState& CurrentAimState() { return g_state; }
 

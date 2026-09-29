@@ -28,6 +28,8 @@ struct AimState {
     float render_origin[3] = {0.0f, 0.0f, 0.0f};  // eye the frame is drawn from
     float render_angles[3] = {0.0f, 0.0f, 0.0f};  // QAngle the frame renders with
     float light_angles[3] = {0.0f, 0.0f, 0.0f};
+    // Set by PublishAimState, distinct for every published frame.
+    unsigned frame = 0;
 };
 
 // Called once per frame by the render-view detour, before the original call.

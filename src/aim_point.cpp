@@ -65,6 +65,18 @@ constexpr int kEarlyLines           = 20;
 constexpr int kEarlyIntervalFrames  = 600;
 constexpr int kSteadyIntervalFrames = 2000;
 
+// The HUD asks for the crosshair's position twice a frame, and each answer is a
+// full-length MASK_SHOT trace. Nothing moves between two paints of one frame,
+// so the first answer is kept for the rest of it.
+struct CachedReticle {
+    unsigned frame = 0;
+    float offset[3] = {0.0f, 0.0f, 0.0f};
+    bool ok = false;
+    float x = 0.0f, y = 0.0f;
+    bool behind = false;
+};
+CachedReticle g_cache;
+
 struct TraceResult {
     float point[3];
     float distance;
@@ -163,12 +175,11 @@ bool ResolveAimPoint() {
     return true;
 }
 
-bool ComputeReticlePosition(const float offsetAngles[3], float& x, float& y,
-                            bool& behindCamera) {
-    if (!g_available) return false;
-    const AimState& aim = CurrentAimState();
-    if (!aim.applied) return false;
+namespace {
 
+// The uncached answer: one trace, one projection.
+bool ResolveReticlePosition(const AimState& aim, const float offsetAngles[3], float& x, float& y,
+                            bool& behindCamera) {
     // No local player means no shot to mark - the crosshair is not drawn then
     // either, but the trace would run against a null ignore-entity.
     if (!g_localPlayer()) return false;
@@ -203,6 +214,31 @@ bool ComputeReticlePosition(const float offsetAngles[3], float& x, float& y,
     if (!std::isfinite(x) || !std::isfinite(y)) return false;
 
     LogAim(aim, trace, ndc, x, y, w, h);
+    return true;
+}
+
+}  // namespace
+
+bool ComputeReticlePosition(const float offsetAngles[3], float& x, float& y,
+                            bool& behindCamera) {
+    if (!g_available) return false;
+    const AimState& aim = CurrentAimState();
+    if (!aim.applied) return false;
+
+    const bool sameAsCached = g_cache.frame == aim.frame &&
+                              g_cache.offset[0] == offsetAngles[0] &&
+                              g_cache.offset[1] == offsetAngles[1] &&
+                              g_cache.offset[2] == offsetAngles[2];
+    if (!sameAsCached) {
+        g_cache.frame = aim.frame;
+        for (int i = 0; i < 3; ++i) g_cache.offset[i] = offsetAngles[i];
+        g_cache.ok = ResolveReticlePosition(aim, offsetAngles, g_cache.x, g_cache.y,
+                                            g_cache.behind);
+    }
+    if (!g_cache.ok) return false;
+    x = g_cache.x;
+    y = g_cache.y;
+    behindCamera = g_cache.behind;
     return true;
 }
 
