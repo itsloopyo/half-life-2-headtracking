@@ -76,9 +76,11 @@ bool GameState::Resolve() {
     // which is seconds after the module itself appears - the module being
     // loaded is not the same event as it being initialised. Reading once on the
     // way past finds a null and gives up on a build that is perfectly fine, so
-    // wait for it the same way the camera hook waits for the module.
-    void** slot = reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(client)
-                                           + off.engine_ptr_rva);
+    // wait for it the same way the camera hook waits for the module. volatile
+    // because the engine writes that slot from its own thread while this one
+    // spins on it: nothing else stops the compiler polling a register forever.
+    void* volatile* slot = reinterpret_cast<void* volatile*>(reinterpret_cast<uintptr_t>(client)
+                                                             + off.engine_ptr_rva);
     void* fromClient = nullptr;
     for (int i = 0; i < kConnectWaitAttempts && fromClient == nullptr; ++i) {
         fromClient = *slot;
