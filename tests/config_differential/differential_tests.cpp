@@ -35,8 +35,8 @@
 // The reader replaces a float that is not finite, clamps the smoothing pair into 0 to 1, and
 // keeps every hotkey code inside 0x01-0xFE, so neither N1 nor N2 can apply.
 //
-// LightFollowsHead and LightMultiplier are new rows. v0.2.0 always turned the flashlight with
-// the head at core's kDefaultLightMultiplier, which is what both rows default to, so every input
+// LightMultiplier is a new row. v0.2.0 always turned the flashlight with
+// the head at core's kDefaultLightMultiplier, which is what this row defaults to, so every input
 // starts with the light as it did.
 //
 // Each input with a file migrates three times: over a Defaults.ini the owner creates with the
@@ -286,7 +286,6 @@ struct Observed {
     float scale_x = 0, scale_y = 0, scale_z = 0;
     float fov = 0, fov_viewmodel = 0;
     bool log_to_file = false;
-    bool light_follows_head = false;
     float light_multiplier = 0;
     std::vector<Hotkey> hotkeys;
 };
@@ -325,7 +324,6 @@ std::vector<std::string> Differences(const Observed& a, const Observed& b) {
     flt(a.fov, b.fov, "FOV override");
     flt(a.fov_viewmodel, b.fov_viewmodel, "viewmodel FOV override");
     if (a.log_to_file != b.log_to_file) out.push_back("log to file");
-    if (a.light_follows_head != b.light_follows_head) out.push_back("light follows head");
     flt(a.light_multiplier, b.light_multiplier, "light multiplier");
     if (a.hotkeys != b.hotkeys) out.push_back("hotkeys");
     return out;
@@ -383,7 +381,6 @@ Observed ObservePublished(const C& c) {
     o.fov = c.fov_override;
     o.fov_viewmodel = c.fov_viewmodel_override;
     o.log_to_file = c.log_to_file;
-    o.light_follows_head = true;
     o.light_multiplier = cameraunlock::effects::kDefaultLightMultiplier;
     o.hotkeys = LegacyHotkeys(c.toggle_vk, c.yaw_mode_vk, c.mode_cycle_vk);
     return o;
@@ -553,7 +550,6 @@ Observed ObserveCanonical(const headtracking::Config& c) {
     o.fov = c.fov_override;
     o.fov_viewmodel = c.fov_viewmodel_override;
     o.log_to_file = c.log_to_file;
-    o.light_follows_head = c.light.follows_head;
     o.light_multiplier = c.light.multiplier;
     const std::pair<Action, const std::string*> lists[] = {
         {kToggle, &c.toggle_key_name}, {kCycleMode, &c.cycle_tracking_mode_key_name}, {kYawMode, &c.yaw_mode_key_name}};
@@ -660,7 +656,7 @@ std::vector<Concept> Untouched(const headtracking::legacy::Config& read) {
     row(read.toggle_vk == shipped.toggle_vk, {Concept::ToggleKey});
     row(read.mode_cycle_vk == shipped.mode_cycle_vk, {Concept::CycleTrackingModeKey});
     row(read.yaw_mode_vk == shipped.yaw_mode_vk, {Concept::YawModeKey});
-    row(true, {Concept::LightFollowsHead, Concept::LightMultiplier});
+    row(true, {Concept::LightMultiplier});
     std::sort(out.begin(), out.end());
     return out;
 }
@@ -693,7 +689,6 @@ Observed FollowDefaults(Observed want, const std::vector<Concept>& untouched, co
     if (has(Concept::PositionLimitYDown)) want.limit_y_down = defaults.limit_y_down;
     if (has(Concept::PositionLimitZ)) want.limit_z = defaults.limit_z;
     if (has(Concept::PositionLimitZBack)) want.limit_z_back = defaults.limit_z_back;
-    if (has(Concept::LightFollowsHead)) want.light_follows_head = defaults.light_follows_head;
     if (has(Concept::LightMultiplier)) want.light_multiplier = defaults.light_multiplier;
     const std::pair<Concept, Action> keys[] = {
         {Concept::ToggleKey, kToggle}, {Concept::CycleTrackingModeKey, kCycleMode}, {Concept::YawModeKey, kYawMode}};
@@ -776,7 +771,7 @@ const char* const kSkewedDefaults =
     "[Position]\r\nPositionEnabled=true\r\nPositionLimitX=0.5\r\nPositionLimitY=0.5\r\nPositionLimitYDown=0.5\r\n"
     "PositionLimitZ=0.5\r\nPositionLimitZBack=0.5\r\n\r\n"
     "[Hotkeys]\r\nToggleKey=F8\r\nCycleTrackingModeKey=F9\r\nYawModeKey=F10\r\n\r\n"
-    "[Light]\r\nLightFollowsHead=false\r\nLightMultiplier=0.5\r\n";
+    "[Light]\r\nLightMultiplier=0.5\r\n";
 
 // The folder beside this executable the migrated files are written to, for lint-migrated.mjs,
 // which CTest runs after this test.
@@ -849,7 +844,7 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
     headtracking::Config skewed_config;
     CanonicalDiagnostics(kSkewedDefaults, skewed_config);
     const Observed skewed_defaults = ObserveCanonical(skewed_config);
-    Check(Differences(builtin, skewed_defaults).size() == 14,
+    Check(Differences(builtin, skewed_defaults).size() == 13,
           "the skewed Defaults.ini differs from the built-in values on every global row");
     std::set<std::string> migrated_files;
     int compared = 0;

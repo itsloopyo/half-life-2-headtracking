@@ -105,7 +105,7 @@ ImportResult Import(const LegacyInput& input, Config& out) {
     out.yaw_mode_key_name = KeyList(c.yaw_mode_vk, 'H', "YawMode", dropped);
 
     // A setting the player never changed from what v0.2.0 shipped follows Defaults.ini. LimitY
-    // stood for both vertical bounds, and the light rows are new.
+    // stood for both vertical bounds, and the light multiplier is new.
     const legacy::Config shipped;
     cameraunlock::config::LegacyFollowsDefaultsIni follows;
     follows.Setting(Concept::UdpPort, c.port, shipped.port);
@@ -122,7 +122,6 @@ ImportResult Import(const LegacyInput& input, Config& out) {
     follows.Setting(Concept::ToggleKey, c.toggle_vk, shipped.toggle_vk);
     follows.Setting(Concept::CycleTrackingModeKey, c.mode_cycle_vk, shipped.mode_cycle_vk);
     follows.Setting(Concept::YawModeKey, c.yaw_mode_vk, shipped.yaw_mode_vk);
-    follows.NotInLegacy(Concept::LightFollowsHead);
     follows.NotInLegacy(Concept::LightMultiplier);
 
     return read == legacy::ReadStatus::Absent
@@ -193,7 +192,7 @@ cameraunlock::config::ConfigTable<Config> MakeConfigTable() {
         {Concept::UdpPort, Concept::EnableOnStartup, Concept::WorldSpaceYaw, Concept::RotationEnabled,
          Concept::LocalSmoothing, Concept::RemoteSmoothing, Concept::PositionEnabled, Concept::PositionLimitX,
          Concept::PositionLimitY, Concept::PositionLimitYDown, Concept::PositionLimitZ, Concept::PositionLimitZBack,
-         Concept::ToggleKey, Concept::CycleTrackingModeKey, Concept::YawModeKey, Concept::LightFollowsHead,
+         Concept::ToggleKey, Concept::CycleTrackingModeKey, Concept::YawModeKey,
          Concept::LightMultiplier});
     table.Select(Concept::WorldSpaceYaw).Writable()
         .Select(Concept::RotationEnabled).Writable()
