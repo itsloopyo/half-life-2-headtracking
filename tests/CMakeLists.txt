@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 itsloopyo / CameraUnlock
-# Characterization tests for the mod's pure logic. Deliberately links nothing
-# from the game or the hooks: anything that needs a live client.dll is verified
-# in-game, and anything that does not belongs here.
+# The registry uses core logging; these tests install no hooks.
 add_executable(hl2_headtracking_tests
     test_main.cpp
     source_math_tests.cpp
@@ -11,11 +9,10 @@ add_executable(hl2_headtracking_tests
     build_profile_tests.cpp
     ${CMAKE_SOURCE_DIR}/src/source_math.cpp
     ${CMAKE_SOURCE_DIR}/src/builds/steam_offsets.cpp
+    ${CMAKE_SOURCE_DIR}/src/builds/build_registry.cpp
 )
+target_link_libraries(hl2_headtracking_tests PRIVATE cameraunlock)
 
-# The core include dir is for header-only types only (PositionSettings, and
-# PeFingerprint for the build profiles), so the suite still links nothing from
-# the game or the hooks.
 target_include_directories(hl2_headtracking_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/cameraunlock-core/cpp/include

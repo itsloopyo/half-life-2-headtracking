@@ -70,6 +70,26 @@ void TestProfileFingerprintsAreDistinct() {
     }
 }
 
+void TestSelectionClearsPreviousMatch() {
+    std::printf("profile selection\n");
+    for (const BuildProfile* profile : kShippedProfiles) {
+        Check(MatchProfile(profile->fingerprint) == profile, "selects the exact campaign profile");
+        Check(ActiveProfile() == profile, "publishes the selected profile");
+        for (int field = 0; field < 3; ++field) {
+            auto unknown = profile->fingerprint;
+            if (field == 0) unknown.TimeDateStamp ^= 1u;
+            if (field == 1) unknown.SizeOfImage ^= 1u;
+            if (field == 2) unknown.CheckSum ^= 1u;
+            Check(MatchProfile(unknown) == nullptr, "rejects an unlisted fingerprint");
+            Check(ActiveProfile() == nullptr, "rejection clears the previous active profile");
+            Check(MatchProfile(unknown) == nullptr && ActiveProfile() == nullptr,
+                  "repeated rejection stays dormant");
+            Check(MatchProfile(profile->fingerprint) == profile,
+                  "an exact match can be selected after rejection");
+        }
+    }
+}
+
 void TestIncompleteProfileStaysDormant() {
     std::printf("dormancy failsafes\n");
 
@@ -125,6 +145,7 @@ int RunBuildProfileTests() {
     std::printf("\nBuild profiles\n==============\n");
     TestShippedSteamProfiles();
     TestProfileFingerprintsAreDistinct();
+    TestSelectionClearsPreviousMatch();
     TestIncompleteProfileStaysDormant();
     TestTraceOffsetsAreBoundsChecked();
     return g_failures;

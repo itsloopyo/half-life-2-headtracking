@@ -21,9 +21,7 @@ const BuildProfile* MatchProfile(const cameraunlock::memory::PeFingerprint& fp);
 // dormant too.
 const BuildProfile* ActiveProfile();
 
-// Dormant-path diagnostic for a build no profile matches: which direction the
-// running build differs in, plus every profile it was compared against, so a
-// user's report needs no follow-up round trip.
+// Logs the unmatched fingerprint and every profile it was compared against.
 void LogUnrecognisedBuild(const cameraunlock::memory::PeFingerprint& fp);
 
 }  // namespace headtracking::builds
