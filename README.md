@@ -12,9 +12,11 @@ An unofficial head tracking mod for Half-Life 2 that moves the view with your he
 
 ## Requirements
 
-- [Half-Life 2](https://store.steampowered.com/app/220/HalfLife_2/) on Steam (app 220), on the build whose `client.dll` is dated 27 June 2025. Both of app 220's branches are covered: the default one, which launches `-game hl2_complete` and plays Half-Life 2, Episode One and Episode Two as a single campaign, and `steam_legacy`, which launches `-game hl2`. On any other build the mod stays dormant and the game runs vanilla.
+- [Half-Life 2](https://store.steampowered.com/app/220/HalfLife_2/) on Steam (app 220). The supported routes are the default `hl2_complete` campaign and `steam_legacy`'s `hl2` campaign, validated with the client DLLs dated 27 June 2025.
 - A tracking source that sends the OpenTrack UDP protocol, such as [OpenTrack](https://github.com/opentrack/opentrack/releases) with a webcam.
 - 64-bit Windows 10 or 11. The game itself is a 32-bit process, so the mod and its loader are both x86.
+
+The mod discovers and validates the required functions, layouts and interfaces at startup, including on an unlisted build. If those checks fail, it leaves the camera unchanged and logs the reason. This does not guarantee compatibility with every future game update.
 
 ## Installation
 
@@ -264,8 +266,8 @@ file.
 Read `HeadTracking.log`, next to `hl2.exe`, first. It is rewritten from empty
 every launch, so it holds the session you just played and nothing older; the
 launch before it is kept as `HeadTracking.prev.log`, which is where a crashed
-session ends up once you relaunch. The log records the build profile that
-matched, whether the hooks installed, the tracker connection and which smoothing
+session ends up once you relaunch. The log records the client fingerprint and
+discovery result, whether the hooks installed, the tracker connection and which smoothing
 is in force. Attach it to a bug report.
 
 **Mod not loading (no log file at all)**
@@ -274,10 +276,10 @@ is in force. Attach it to a bug report.
 - Confirm you took the x86 Ultimate ASI Loader. The x64 build cannot load into a 32-bit process.
 - Confirm `HalfLife2HeadTracking.asi` is in that same `bin\` folder, spelled as shipped, and that `LogToFile` under `[Debug]` in `CameraUnlock.ini` has not been set to `false`.
 
-**Log says the mod is staying dormant**
+**Log says discovery was rejected**
 
-- Your `client.dll` is not in the mod's build profile registry. The log line names the direction: newer than the mod knows about (the game patched, check the Releases page), older (let Steam finish updating), or a repacked binary the mod will not engage on.
-- The Episode One (app 380) and Episode Two (app 420) entries in your Steam library both load `episodic\bin\client.dll`, and Lost Coast and Deathmatch each load their own. None of those are in the registry. The episodes are head-tracked when you play them inside app 220, whose default campaign loads `hl2_complete\bin\client.dll`.
+- A required function, layout or live interface could not be validated. Keep the specific rejection message from `HeadTracking.log` and check the Releases page for an update.
+- The standalone Episode One (app 380), Episode Two (app 420), Lost Coast and Deathmatch campaigns are outside this mod's supported routes. Play the episodes inside app 220's `hl2_complete` campaign.
 
 **No tracking response**
 

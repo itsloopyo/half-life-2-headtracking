@@ -2,7 +2,8 @@
 // Copyright (c) 2026 itsloopyo / CameraUnlock
 #include "builds/build_registry.h"
 
-#include "debug_log.h"
+#include <cstring>
+#include <exception>
 
 namespace headtracking::builds {
 
@@ -14,6 +15,24 @@ const BuildProfile* const kKnownProfiles[] = {
 };
 
 const BuildProfile* g_active = nullptr;
+BuildProfile g_dynamic{};
+DiscoveryResult g_discovery{};
+
+bool SameOffsets(const OffsetTable& a, const OffsetTable& b) {
+    return a.render_view_rva == b.render_view_rva &&
+        std::memcmp(&a.view_setup, &b.view_setup, sizeof(a.view_setup)) == 0 &&
+        std::memcmp(&a.aim, &b.aim, sizeof(a.aim)) == 0 &&
+        std::memcmp(&a.fov, &b.fov, sizeof(a.fov)) == 0 &&
+        a.engine.engine_ptr_rva == b.engine.engine_ptr_rva &&
+        std::strcmp(a.engine.interface_version, b.engine.interface_version) == 0 &&
+        a.engine.slot_is_in_game == b.engine.slot_is_in_game &&
+        a.engine.slot_is_paused == b.engine.slot_is_paused &&
+        a.engine.slot_is_menu_background == b.engine.slot_is_menu_background &&
+        a.engine.slot_is_drawing_loading_image == b.engine.slot_is_drawing_loading_image &&
+        a.engine.slot_get_max_clients == b.engine.slot_get_max_clients &&
+        a.engine.slot_get_level_name == b.engine.slot_get_level_name &&
+        a.flashlight_update_rva == b.flashlight_update_rva && a.player_flashlight == b.player_flashlight;
+}
 
 }  // namespace
 
@@ -30,15 +49,29 @@ const BuildProfile* MatchProfile(const cameraunlock::memory::PeFingerprint& fp) 
 
 const BuildProfile* ActiveProfile() { return g_active; }
 
-void LogUnrecognisedBuild(const cameraunlock::memory::PeFingerprint& fp) {
-    HT_LOG("[hook] no build profile matches client.dll (TimeDateStamp=0x%08X "
-           "SizeOfImage=0x%08X CheckSum=0x%08X); runtime discovery is unavailable "
-           "- staying dormant", fp.TimeDateStamp, fp.SizeOfImage, fp.CheckSum);
-    for (const BuildProfile* p : kKnownProfiles) {
-        HT_LOG("[hook]   known profile '%s': TimeDateStamp=0x%08X SizeOfImage=0x%08X "
-               "CheckSum=0x%08X",
-               p->name, p->fingerprint.TimeDateStamp, p->fingerprint.SizeOfImage,
-               p->fingerprint.CheckSum);
+const DiscoveryResult* ActiveDiscovery() {
+    return g_active == &g_dynamic ? &g_discovery : nullptr;
+}
+
+const BuildProfile* SelectProfile(const DiscoveryImage& image,
+    const cameraunlock::memory::PeFingerprint& fingerprint, std::string& error) {
+    g_active = nullptr;
+    g_dynamic = {};
+    g_discovery = {};
+    error.clear();
+    try {
+        const auto discovered = Discover(image);
+        for (const auto* known : kKnownProfiles)
+            if (known->fingerprint.Matches(fingerprint))
+                Require(SameOffsets(known->offsets, discovered.offsets),
+                        "runtime discovery disagrees with the exact historical profile");
+        g_discovery = discovered;
+        g_dynamic = {"runtime-source-win32", fingerprint, discovered.offsets};
+        g_active = &g_dynamic;
+        return g_active;
+    } catch (const std::exception& failure) {
+        error = failure.what();
+        return nullptr;
     }
 }
 

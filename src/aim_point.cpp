@@ -10,6 +10,7 @@
 
 #include "aim_state.h"
 #include "builds/build_registry.h"
+#include "builds/runtime_validation.h"
 #include "debug_log.h"
 #include "log_throttle.h"
 #include "source_math.h"
@@ -221,7 +222,7 @@ bool ResolveReticlePosition(const AimState& aim, const float offsetAngles[3], fl
 
 bool ComputeReticlePosition(const float offsetAngles[3], float& x, float& y,
                             bool& behindCamera) {
-    if (!g_available) return false;
+    if (!g_available || !builds::RuntimeHealthy()) return false;
     const AimState& aim = CurrentAimState();
     if (!aim.applied) return false;
 

@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 itsloopyo / CameraUnlock
-# The registry uses core logging; these tests install no hooks.
+# These tests install no hooks.
 add_executable(hl2_headtracking_tests
     test_main.cpp
     source_math_tests.cpp
     position_mapping_tests.cpp
     log_throttle_tests.cpp
     build_profile_tests.cpp
+    discovery_tests.cpp
     ${CMAKE_SOURCE_DIR}/src/source_math.cpp
     ${CMAKE_SOURCE_DIR}/src/builds/steam_offsets.cpp
     ${CMAKE_SOURCE_DIR}/src/builds/build_registry.cpp
 )
-target_link_libraries(hl2_headtracking_tests PRIVATE cameraunlock)
+target_link_libraries(hl2_headtracking_tests PRIVATE cameraunlock hl2_discovery)
 
 target_include_directories(hl2_headtracking_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src

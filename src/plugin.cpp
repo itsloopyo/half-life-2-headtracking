@@ -5,7 +5,6 @@
 #include <exception>
 
 #include "camera_hook.h"
-#include "crosshair_hook.h"
 #include "debug_log.h"
 #include "hotkey_handler.h"
 
@@ -46,11 +45,6 @@ void Plugin::Initialize() {
         // Not a fatal error: a dormant hook (unrecognised game build) must
         // leave the game fully playable. Hotkeys/receiver still run so a log
         // inspection shows tracking data arriving.
-    } else {
-        // Only meaningful once the camera hook has resolved the build, and only
-        // worth installing if the view is actually being modified.
-        m_crosshairHook = std::make_unique<CrosshairHook>();
-        m_crosshairHook->Install();
     }
 
     m_hotkeys = std::make_unique<HotkeyHandler>();

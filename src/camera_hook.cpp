@@ -17,10 +17,8 @@
 // game's own camera (the player's eye angles) is untouched. Look and aim stay
 // decoupled for free.
 //
-// Engagement is gated on a PE-fingerprint build-profile registry (append-only;
-// see the "Maintain compatibility across new patches" doctrine and
-// builds/build_registry.h). On any client.dll the registry does not recognise,
-// the hook is never installed and the game runs vanilla.
+// Discovery validates the complete dependency set and live interface identities
+// before installing hooks. Historical profiles independently cross-check it.
 
 #include "camera_hook.h"
 
@@ -30,10 +28,11 @@
 #include "aim_state.h"
 #include "angles.h"
 #include "builds/build_registry.h"
+#include "builds/runtime_validation.h"
 #include "cameraunlock/effects/head_follow_light.h"
 #include "cameraunlock/hooks/hook_manager.h"
-#include "cameraunlock/memory/pe_fingerprint.h"
 #include "config.h"
+#include "crosshair_hook.h"
 #include "debug_log.h"
 #include "detour.h"
 #include "fov_override.h"
@@ -230,7 +229,7 @@ void ApplyTracking(const ViewSetup& view) {
 
 void __fastcall Hook_RenderView(void* ecx, void* edx, void* view, int clearFlags,
                                 int whatToDraw) {
-    if (view) {
+    if (view && builds::ValidateRenderObject(ecx)) {
         try {
             ApplyTracking(ViewSetup(view, g_profile->offsets.view_setup));
         } catch (...) {
@@ -239,7 +238,7 @@ void __fastcall Hook_RenderView(void* ecx, void* edx, void* view, int clearFlags
         }
     }
 
-    if (view) BeginFlashlightView(CurrentAimState());
+    if (view && builds::RuntimeHealthy()) BeginFlashlightView(CurrentAimState());
     g_originalRenderView(ecx, edx, view, clearFlags, whatToDraw);
     EndFlashlightView();
 }
@@ -259,40 +258,7 @@ HMODULE WaitForClientModule() {
     return nullptr;
 }
 
-// Fingerprints the running client.dll and returns its profile, or nullptr -
-// which is the dormant path: the game runs vanilla and the log says why.
-const builds::BuildProfile* ResolveBuildProfile(HMODULE client) {
-    cameraunlock::memory::PeFingerprint fp{};
-    if (!cameraunlock::memory::ReadPeFingerprint(client, fp)) {
-        HT_LOG("[hook] could not read client.dll fingerprint");
-        return nullptr;
-    }
-    HT_LOG("[hook] client.dll fingerprint TimeDateStamp=0x%08X SizeOfImage=0x%08X CheckSum=0x%08X",
-           fp.TimeDateStamp, fp.SizeOfImage, fp.CheckSum);
-
-    const builds::BuildProfile* profile = builds::MatchProfile(fp);
-    if (!profile) {
-        builds::LogUnrecognisedBuild(fp);
-        return nullptr;
-    }
-    if (!profile->IsComplete()) {
-        HT_LOG("[hook] build profile '%s' is a placeholder (hook target not yet rederived) "
-               "- staying dormant", profile->name);
-        return nullptr;
-    }
-    HT_LOG("[hook] matched build profile '%s'", profile->name);
-    return profile;
-}
-
-// This is the mod's first hook, so it is where MinHook itself is brought up.
 bool InstallRenderViewDetour(void* target) {
-    using cameraunlock::hooks::HookManager;
-    using cameraunlock::hooks::HookStatus;
-
-    if (HookManager::Instance().Initialize() != HookStatus::Ok) {
-        HT_LOG("[hook] MinHook init failed");
-        return false;
-    }
     return InstallDetour("hook", "RenderView", target,
                          reinterpret_cast<void*>(&Hook_RenderView),
                          reinterpret_cast<void**>(&g_originalRenderView));
@@ -309,20 +275,31 @@ bool CameraHook::Install() {
 
     // Published before the detour is armed: the very first RenderView can land
     // inside EnableHook, and it dereferences this.
-    g_profile = ResolveBuildProfile(client);
+    g_profile = builds::ResolveRuntimeBuild(client);
     if (!g_profile) return false;
 
     // Before the detour too, and fatal if it fails: the gate is what keeps the
     // pose out of the menu backdrop and out of a multiplayer session, so a hook
     // installed without one is worse than no hook at all.
     if (!GetGameState().Resolve()) return false;
+    if (!builds::ValidateRuntimeObjects(client)) return false;
 
     ResolveFovConVars(client, *g_profile);
 
     void* target = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(client)
                                            + g_profile->offsets.render_view_rva);
-    if (!InstallRenderViewDetour(target)) return false;
-    InstallFlashlightHook(client, *g_profile);
+    auto& hooks = cameraunlock::hooks::HookManager::Instance();
+    const auto initialized = hooks.Initialize();
+    if (initialized != cameraunlock::hooks::HookStatus::Ok) {
+        HT_LOG("[hook] MinHook initialization failed: %s", cameraunlock::hooks::HookStatusToString(initialized));
+        return false;
+    }
+    CrosshairHook crosshair;
+    if (!crosshair.Install() || !InstallFlashlightHook(client, *g_profile) || !InstallRenderViewDetour(target)) {
+        hooks.Shutdown();
+        HT_LOG("[hook] required hook installation failed; all mod hooks removed");
+        return false;
+    }
     return true;
 }
 

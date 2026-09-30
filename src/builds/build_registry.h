@@ -3,6 +3,7 @@
 #pragma once
 
 #include "builds/build_profile.h"
+#include "builds/runtime_discovery.h"
 
 namespace headtracking::builds {
 
@@ -15,13 +16,10 @@ extern const BuildProfile kSteamProfile_20250627;
 // The profile whose fingerprint matches this client.dll, or nullptr.
 const BuildProfile* MatchProfile(const cameraunlock::memory::PeFingerprint& fp);
 
-// The profile MatchProfile last matched, for the hooks that install after the
-// camera hook has already resolved the build. nullptr until then, and on an
-// unrecognised build it stays nullptr - which is what keeps every later hook
-// dormant too.
+// Selection publishes only after validation and clears the result on failure.
 const BuildProfile* ActiveProfile();
-
-// Logs the unmatched fingerprint and every profile it was compared against.
-void LogUnrecognisedBuild(const cameraunlock::memory::PeFingerprint& fp);
+const BuildProfile* SelectProfile(const DiscoveryImage& image,
+    const cameraunlock::memory::PeFingerprint& fingerprint, std::string& error);
+const DiscoveryResult* ActiveDiscovery();
 
 }  // namespace headtracking::builds

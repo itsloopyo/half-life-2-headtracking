@@ -8,9 +8,8 @@
 
 namespace headtracking::builds {
 
-// Byte offsets of the CViewSetup fields the render-view detour reads and
-// writes. Source ships no headers, so these are rederived per build and pinned
-// to that build's fingerprint - see the registry below.
+// Public Win32 CViewSetup ABI, corroborated against the render boundary's
+// typed copy and containing extent before use.
 struct ViewSetupOffsets {
     uint32_t origin;         // Vector origin
     uint32_t angles;         // QAngle angles (pitch, yaw, roll)
@@ -35,13 +34,8 @@ struct AimOffsets {
     uint32_t trace_fraction;      // byte offset of trace_t::fraction
 };
 
-// The scratch buffer aim_point.cpp hands the engine's trace, and the bound the
-// two trace_t field offsets above are read within. Wider than any trace_t this
-// engine writes, so the engine's own write always fits; the OFFSETS are
-// per-build data, rederived by hand for every profile, so they are checked
-// against it at load rather than trusted. An out-of-range one would read past
-// the end of a stack buffer, which is the one way a mistyped offset stops being
-// a wrong crosshair and starts being a memory fault.
+// EngineTraceClient003's public Win32 CGameTrace is 84 bytes. The larger
+// scratch allocation is retained; a different interface ABI must be rejected.
 constexpr uint32_t kTraceResultBufferSize = 256;
 
 // Written as a subtraction so an offset near the top of the range cannot wrap
@@ -62,9 +56,8 @@ constexpr bool TraceFieldsFitBuffer(const AimOffsets& aim) {
 // player's: a suit zoom or a scripted camera writes its own, and an override
 // that ignored that would flatten every one of them.
 //
-// `convar_name` is ConCommandBase::m_pszName and is there to be checked, not
-// used: a ConVar object whose name reads back as the expected string is proof
-// the rest of the layout fits, and three plausible floats are not.
+// Name and float value fields are discovered separately; live name equality
+// alone does not establish the value field's type or ownership.
 struct FovConVarOffsets {
     uint32_t fov_desired_rva;    // the fov_desired ConVar object in client.dll
     uint32_t viewmodel_fov_rva;  // the viewmodel_fov ConVar object
@@ -88,7 +81,7 @@ struct EngineStateOffsets {
     uint16_t slot_get_level_name;
 };
 
-// The whole surface one client.dll build pins.
+// Complete dependency set shared by discovery and historical cross-checks.
 struct OffsetTable {
     uint32_t render_view_rva;  // CViewRender::RenderView, RVA in client.dll
     ViewSetupOffsets view_setup;
@@ -99,22 +92,14 @@ struct OffsetTable {
     uint32_t player_flashlight;
 };
 
-// One entry per shipped Half-Life 2 client.dll build we have offsets for. The
-// PE fingerprint is the routing key.
+// Historical measurements or a complete runtime discovery result.
 struct BuildProfile {
     const char* name;
     cameraunlock::memory::PeFingerprint fingerprint;
     OffsetTable offsets;
 
-    // A profile whose hook target is still unresolved is a placeholder: the
-    // fingerprint of a build we have spotted but not yet rederived. It must
-    // stay dormant rather than hook a stale address, so the entry can be
-    // landed the moment a patch appears without risking a user's session.
     bool IsComplete() const { return offsets.render_view_rva != 0; }
 
-    // Reticle compensation is a separate, optional surface: a profile can drive
-    // the camera without it. A build whose aim addresses have not been derived
-    // keeps head tracking and draws the vanilla centred crosshair.
     bool HasAimOffsets() const {
         return offsets.aim.draw_position_rva != 0 && offsets.aim.trace_line_rva != 0 &&
                offsets.aim.screen_transform_rva != 0 && offsets.aim.viewport_rva != 0 &&
@@ -125,9 +110,6 @@ struct BuildProfile {
         return offsets.engine.engine_ptr_rva != 0 && offsets.engine.interface_version != nullptr;
     }
 
-    // Also optional, and separately so: a build whose FOV ConVars have not been
-    // located still tracks the head and still draws the reticle on the shot, it
-    // just leaves the [View] Fov keys inert.
     bool HasFovConVars() const {
         return offsets.fov.fov_desired_rva != 0 && offsets.fov.viewmodel_fov_rva != 0;
     }

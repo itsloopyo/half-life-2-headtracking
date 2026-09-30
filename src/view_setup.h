@@ -8,11 +8,7 @@
 
 namespace headtracking {
 
-// Typed access to the CViewSetup a hooked render call is about to consume.
-// Source ships no header for the struct, so every field is reached through the
-// running build's profile offsets rather than a declaration - which is exactly
-// why the offsets travel with the view instead of sitting in a global: a
-// mismatched pair writes floats into the middle of an unrelated field.
+// The offsets belong to the validated render boundary's CViewSetup ABI.
 class ViewSetup {
 public:
     ViewSetup(void* view, const builds::ViewSetupOffsets& offsets)

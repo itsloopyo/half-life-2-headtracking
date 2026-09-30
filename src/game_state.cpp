@@ -13,10 +13,7 @@ namespace headtracking {
 
 namespace {
 
-// Calls one slot of a Source interface. The slot numbers are pinned per build
-// profile and belong to the interface VERSION named there, which is why
-// Resolve() proves the running client is on that version before any of this
-// runs.
+// These slots belong to the named public interface version validated by Resolve.
 template <typename R, typename... Args>
 R CallSlot(void* iface, unsigned slot, Args... args) {
     using Fn = R(__thiscall*)(void*, Args...);

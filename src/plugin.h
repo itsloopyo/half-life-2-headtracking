@@ -14,7 +14,6 @@
 namespace headtracking {
 
 class CameraHook;
-class CrosshairHook;
 class HotkeyHandler;
 
 // Mod-level coordinator: owns the config, the tracker feed, the render-view
@@ -66,7 +65,6 @@ private:
     TrackerFeed m_feed;
 
     std::unique_ptr<CameraHook>    m_cameraHook;
-    std::unique_ptr<CrosshairHook> m_crosshairHook;
     std::unique_ptr<HotkeyHandler> m_hotkeys;
 };
 

@@ -7,6 +7,7 @@
 
 #include "aim_state.h"
 #include "builds/build_profile.h"
+#include "builds/runtime_validation.h"
 #include "debug_log.h"
 #include "detour.h"
 #include "game_state.h"
@@ -19,10 +20,7 @@ namespace {
 // UpdateLight takes four Vector references and an integer distance, and pops 20 bytes.
 using UpdateLightFn = void(__fastcall*)(void*, void*, const float*, const float*,
                                        const float*, const float*, int);
-using LocalPlayerFn = void*(__cdecl*)();
 UpdateLightFn g_original = nullptr;
-LocalPlayerFn g_localPlayer = nullptr;
-uint32_t g_flashlightOffset = 0;
 const AimState* g_view = nullptr;
 
 struct PendingLight {
@@ -33,9 +31,7 @@ struct PendingLight {
 PendingLight g_pending;
 
 void* LocalFlashlight() {
-    void* player = g_localPlayer();
-    return player ? *reinterpret_cast<void**>(static_cast<uint8_t*>(player)
-                                             + g_flashlightOffset) : nullptr;
+    return builds::ValidatedLocalFlashlight();
 }
 
 void UpdateTrackedLight(void* light, const float* origin, const float* forward,
@@ -91,8 +87,6 @@ bool InstallFlashlightHook(void* client, const builds::BuildProfile& profile) {
         return false;
     }
     auto* base = static_cast<uint8_t*>(client);
-    g_localPlayer = reinterpret_cast<LocalPlayerFn>(base + offsets.aim.local_player_rva);
-    g_flashlightOffset = offsets.player_flashlight;
     return InstallDetour("flashlight", "UpdateLight", base + offsets.flashlight_update_rva,
                          reinterpret_cast<void*>(&HookUpdateLight),
                          reinterpret_cast<void**>(&g_original));

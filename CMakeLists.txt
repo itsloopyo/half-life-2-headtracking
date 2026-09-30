@@ -37,6 +37,15 @@ set(CAMERAUNLOCK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CAMERAUNLOCK_BUILD_HOOKS ON CACHE BOOL "" FORCE)
 add_subdirectory(cameraunlock-core/cpp ${CMAKE_BINARY_DIR}/cameraunlock-core)
 
+add_library(hl2_discovery STATIC
+    src/builds/discovery_image.cpp
+    src/builds/runtime_discovery.cpp
+)
+target_include_directories(hl2_discovery PUBLIC src cameraunlock-core/cpp/include
+    "${MINHOOK_DIR}/src/hde" "${minhook_SOURCE_DIR}/src/hde")
+target_link_libraries(hl2_discovery PUBLIC minhook)
+target_compile_options(hl2_discovery PRIVATE /W4 /WX)
+
 add_library(HalfLife2HeadTracking SHARED
     src/pch.cpp
     src/dllmain.cpp
@@ -57,13 +66,12 @@ add_library(HalfLife2HeadTracking SHARED
     src/source_math.cpp
     src/builds/build_registry.cpp
     src/builds/steam_offsets.cpp
+    src/builds/runtime_validation.cpp
 )
 
 target_precompile_headers(HalfLife2HeadTracking PRIVATE src/pch.h)
 
-# The same bar the test suite is held to. Everything in src/ writes into a
-# running game's memory through offsets no header declares, so a truncation or
-# an unreferenced local is worth stopping the build for.
+# A truncation in a native pointer or field offset must stop the build.
 if(MSVC)
     target_compile_options(HalfLife2HeadTracking PRIVATE /W4 /WX)
 else()
@@ -85,6 +93,7 @@ target_link_libraries(HalfLife2HeadTracking PRIVATE
     cameraunlock
     cameraunlock_hooks
     minhook
+    hl2_discovery
     ws2_32
 )
 

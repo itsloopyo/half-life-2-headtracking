@@ -43,7 +43,7 @@ SOFTWARE.
 - **Version:** v1.3.4 (commit `c3fcafdc10146beb5919319d0683e44e3c30d537`)
 - **License:** BSD-2-Clause
 - **Upstream:** https://github.com/TsudaKageyu/minhook
-- **Usage:** x86 inline function hooking, used to install the camera, crosshair and game state hooks.
+- **Usage:** x86 inline function hooking for the camera, crosshair and flashlight, plus bounded instruction decoding through its Hacker Disassembler Engine for runtime discovery.
 - **Bundled:** yes. Statically linked into `HalfLife2HeadTracking.asi`.
 
 The notice below carries two rights holders: Tsuda Kageyu for MinHook, and
@@ -758,9 +758,14 @@ supported by Valve, and it requires a copy of the game the user already owns.
 No Valve code, header, asset or Source SDK file is copied into, compiled into or
 redistributed by this project, and none is needed to build it - `pixi run
 package` produces both release ZIPs on a machine with no copy of the game
-installed. The byte offsets and RVAs in `src/builds/` are measurements of the
-retail binary, recorded so the mod can interoperate with it at runtime; they are
-facts about a build, not Valve's code. The camera maths in `src/source_math.cpp`
+installed. Historical byte offsets and RVAs in `src/builds/` are measurements of
+the retail binary, retained as independent checks of runtime discovery.
+The public [Source SDK declarations](https://github.com/ValveSoftware/source-sdk-2013/tree/master/src/public)
+in `view_shared.h`, `cdll_int.h`, `engine/IEngineTrace.h`, `trace.h` and
+`gametrace.h` supply the names, calling contracts and Win32 ABI facts for
+`CViewSetup`, `VEngineClient014`, `VClient017`, `EngineTraceClient003` and
+`CGameTrace`. No SDK implementation is incorporated. The discovery recognizers
+and instruction fixtures are independently authored. The camera maths in `src/source_math.cpp`
 is written from the standard Euler-basis formulas and pinned by the tests in
 `tests/`, not derived from any Valve source.
 
