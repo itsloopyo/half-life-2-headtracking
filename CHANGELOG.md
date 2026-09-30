@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] - 2026-09-30
+
+### Added
+
+- discover Half-Life 2 camera dependencies at runtime
+
+### Fixed
+
+- clear stale build selection when a fingerprint is rejected
+
 ## [0.3.0] - 2026-09-30
 
 ### Added
